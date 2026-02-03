@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         return self.SUPPORTED_FORMATS.split(',')
 
     # 模型配置
-    WHISPER_MODEL: str = "base"
+    WHISPER_MODEL: str = "tiny"  # 使用最小最快的模型以加快分析速度
     YOLO_MODEL: str = "yolov8n.pt"
 
     class Config:

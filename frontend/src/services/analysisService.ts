@@ -102,7 +102,7 @@ export const startAnalysis = async (
     {
       params: { use_ai: useAI },
       headers,
-      timeout: 300000 // 5分钟超时
+      timeout: 600000 // 10分钟超时（视频分析可能很耗时）
     }
   )
   return response.data
