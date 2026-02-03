@@ -48,6 +48,20 @@ logger.add(
 )
 
 
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时执行的操作"""
+    # 确保必要的目录存在
+    os.makedirs("uploads", exist_ok=True)
+    os.makedirs("temp", exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
+
+    # 初始化数据库，创建所有表
+    from app.db import init_db
+    init_db()
+    logger.info("数据库初始化完成")
+
+
 @app.get("/")
 async def root():
     """根路径，返回 API 信息"""
