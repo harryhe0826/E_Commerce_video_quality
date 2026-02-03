@@ -11,6 +11,7 @@ from loguru import logger
 
 from app.db import Video, AnalysisResult
 from app.config import settings
+from app.services.storage_service import storage_service
 from app.utils.video_utils import extract_audio, extract_key_frames, get_video_info
 
 # 特征提取器
@@ -83,6 +84,8 @@ class AnalysisService:
         Returns:
             分析结果
         """
+        temp_video_path = None
+
         try:
             logger.info(f"Starting analysis for video: {video_id}")
 
@@ -91,26 +94,49 @@ class AnalysisService:
             if not video:
                 return {"success": False, "error": "视频不存在"}
 
-            video_path = video.file_path
+            # 2. 如果使用 R2，需要下载视频到临时位置
+            if settings.USE_R2_STORAGE:
+                logger.info(f"Downloading video from R2 for analysis: {video_id}")
+                # 从 URL 提取 object_key
+                if '/videos/' in video.file_path:
+                    object_key = video.file_path.split('/videos/', 1)[1]
+                    object_key = f"videos/{object_key}"
+                else:
+                    # 无法提取 object_key
+                    return {"success": False, "error": "无法从 R2 URL 提取文件路径"}
+
+                # 下载到临时文件
+                from pathlib import Path
+                ext = Path(video.filename).suffix
+                temp_video_path = storage_service.create_temp_file_from_r2(object_key, suffix=ext)
+
+                if not temp_video_path:
+                    return {"success": False, "error": "无法从 R2 下载视频文件"}
+
+                video_path = temp_video_path
+            else:
+                # 本地存储，直接使用 file_path
+                video_path = video.file_path
+
             duration = video.duration or 0
 
-            # 2. 创建临时目录
+            # 3. 创建临时目录
             temp_dir = os.path.join(settings.TEMP_DIR, video_id)
             os.makedirs(temp_dir, exist_ok=True)
 
-            # 3. 特征提取
+            # 4. 特征提取
             logger.info(f"Extracting features for {video_id}")
             features = self._extract_features(video_path, temp_dir, duration)
 
-            # 4. 运行分析器
+            # 5. 运行分析器
             logger.info(f"Running analyzers for {video_id}")
             analysis_results = self._run_analyzers(features)
 
-            # 5. 规则评分
+            # 6. 规则评分
             logger.info(f"Evaluating with rules for {video_id}")
             evaluation = self._evaluate_with_rules(analysis_results)
 
-            # 6. AI 评估（可选）
+            # 7. AI 评估（可选）
             if use_ai:
                 logger.info(f"Evaluating with AI for {video_id}")
                 ai_result = self._evaluate_with_ai(
@@ -123,7 +149,7 @@ class AnalysisService:
                 )
                 evaluation["ai_evaluation"] = ai_result
 
-            # 7. 保存结果
+            # 8. 保存结果
             logger.info(f"Saving results for {video_id}")
             result_id = self._save_results(video_id, evaluation)
 
@@ -143,6 +169,14 @@ class AnalysisService:
                 "success": False,
                 "error": str(e)
             }
+        finally:
+            # 清理临时视频文件
+            if temp_video_path and os.path.exists(temp_video_path):
+                try:
+                    os.remove(temp_video_path)
+                    logger.debug(f"Cleaned up temp video file: {temp_video_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp video file: {e}")
 
     def _extract_features(
         self,

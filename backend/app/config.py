@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     # 数据库
     DATABASE_URL: str = "sqlite:///./video_quality.db"
 
+    # Cloudflare R2 对象存储配置
+    USE_R2_STORAGE: bool = False  # 是否使用 R2 存储
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET_NAME: str = "video-quality-uploads"
+    R2_PUBLIC_URL: str = ""  # R2 公共访问域名（如果配置了 custom domain）
+
     # 服务器
     HOST: str = "0.0.0.0"
     PORT: int = 8000

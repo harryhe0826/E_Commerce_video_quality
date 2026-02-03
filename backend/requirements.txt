@@ -29,6 +29,9 @@ openai>=1.0.0  # 支持 OpenAI 兼容的第三方平台（如 aihubmix）
 # 数据库
 sqlalchemy==2.0.25
 
+# 对象存储
+boto3==1.34.26
+
 # 工具
 python-dotenv==1.0.0
 loguru==0.7.2

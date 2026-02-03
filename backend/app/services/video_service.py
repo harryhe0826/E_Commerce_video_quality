@@ -9,6 +9,7 @@ from loguru import logger
 
 from app.db import Video
 from app.config import settings
+from app.services.storage_service import storage_service
 from app.utils.video_utils import (
     get_video_info,
     extract_audio,
@@ -26,14 +27,14 @@ class VideoService:
 
     def save_uploaded_video(self, file_content: bytes, filename: str) -> tuple[str, str]:
         """
-        保存上传的视频文件
+        保存上传的视频文件（到 R2 或本地）
 
         Args:
             file_content: 文件内容
             filename: 原始文件名
 
         Returns:
-            (video_id, file_path)
+            (video_id, file_url_or_path)
         """
         # 生成唯一 ID
         video_id = f"vid_{uuid.uuid4().hex[:12]}"
@@ -42,29 +43,71 @@ class VideoService:
         ext = Path(filename).suffix
         new_filename = f"{video_id}{ext}"
 
-        # 保存文件
-        file_path = os.path.join(settings.UPLOAD_DIR, new_filename)
+        # 构建对象键（用于 R2）或文件路径（用于本地存储）
+        object_key = f"videos/{new_filename}"
 
-        with open(file_path, 'wb') as f:
-            f.write(file_content)
+        # 确定 content_type
+        content_type_map = {
+            '.mp4': 'video/mp4',
+            '.mov': 'video/quicktime',
+            '.avi': 'video/x-msvideo',
+        }
+        content_type = content_type_map.get(ext.lower(), 'application/octet-stream')
 
-        logger.info(f"Video saved: {file_path}")
-        return video_id, file_path
+        # 使用存储服务上传（自动处理 R2 或本地存储）
+        file_url = storage_service.upload_file(file_content, object_key, content_type)
 
-    def process_video(self, video_id: str, file_path: str, filename: str) -> dict:
+        if not file_url:
+            raise Exception("Failed to upload video to storage")
+
+        logger.info(f"Video saved: {file_url}")
+        return video_id, file_url
+
+    def process_video(self, video_id: str, file_url: str, filename: str) -> dict:
         """
         处理上传的视频
 
         Args:
             video_id: 视频 ID
-            file_path: 文件路径
+            file_url: 文件 URL（R2）或本地路径
             filename: 原始文件名
 
         Returns:
             处理结果字典
         """
+        temp_file_path = None
+
         try:
-            # 1. 验证视频文件
+            # 1. 如果使用 R2，需要下载到临时文件进行分析
+            if settings.USE_R2_STORAGE:
+                # 从 URL 提取 object_key
+                # file_url 格式: https://bucket.account.r2.cloudflarestorage.com/videos/vid_xxx.mp4
+                # 或: https://custom-domain.com/videos/vid_xxx.mp4
+                # 我们需要提取 "videos/vid_xxx.mp4" 部分
+                if '/videos/' in file_url:
+                    object_key = file_url.split('/videos/', 1)[1]
+                    object_key = f"videos/{object_key}"
+                else:
+                    # 如果无法提取，使用 video_id 构建
+                    ext = Path(filename).suffix
+                    object_key = f"videos/{video_id}{ext}"
+
+                # 下载到临时文件
+                ext = Path(filename).suffix
+                temp_file_path = storage_service.create_temp_file_from_r2(object_key, suffix=ext)
+
+                if not temp_file_path:
+                    return {
+                        'success': False,
+                        'error': '无法从存储下载视频文件'
+                    }
+
+                file_path = temp_file_path
+            else:
+                # 本地存储，file_url 就是本地路径
+                file_path = file_url
+
+            # 2. 验证视频文件
             logger.info(f"Validating video: {video_id}")
             is_valid, error_msg = validate_video_file(
                 file_path,
@@ -78,7 +121,7 @@ class VideoService:
                     'error': error_msg
                 }
 
-            # 2. 提取视频信息
+            # 3. 提取视频信息
             logger.info(f"Extracting video info: {video_id}")
             video_info = get_video_info(file_path)
 
@@ -88,13 +131,14 @@ class VideoService:
                     'error': '无法读取视频信息'
                 }
 
-            # 3. 保存视频记录到数据库
+            # 4. 获取文件大小
             file_size = os.path.getsize(file_path)
 
+            # 5. 保存视频记录到数据库（存储 R2 URL 或本地路径）
             video = Video(
                 id=video_id,
                 filename=filename,
-                file_path=file_path,
+                file_path=file_url,  # 存储 R2 URL 或本地路径
                 duration=video_info.get('duration'),
                 resolution=video_info.get('resolution'),
                 fps=video_info.get('fps'),
@@ -108,7 +152,7 @@ class VideoService:
 
             logger.info(f"Video record saved to database: {video_id}")
 
-            # 4. 预处理（可选）- 提取音频和关键帧
+            # 6. 预处理（可选）- 提取音频和关键帧
             # 这部分可以在分析时再做，上传阶段暂时跳过
             # self._preprocess_video(video_id, file_path)
 
@@ -125,6 +169,14 @@ class VideoService:
                 'success': False,
                 'error': str(e)
             }
+        finally:
+            # 清理临时文件
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.remove(temp_file_path)
+                    logger.debug(f"Cleaned up temp file: {temp_file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp file: {e}")
 
     def _preprocess_video(self, video_id: str, file_path: str):
         """
@@ -202,9 +254,17 @@ class VideoService:
             if not video:
                 return False
 
-            # 删除文件
-            if os.path.exists(video.file_path):
-                os.remove(video.file_path)
+            # 删除文件（从 R2 或本地）
+            if settings.USE_R2_STORAGE:
+                # 从 file_path (R2 URL) 提取 object_key
+                if '/videos/' in video.file_path:
+                    object_key = video.file_path.split('/videos/', 1)[1]
+                    object_key = f"videos/{object_key}"
+                    storage_service.delete_file(object_key)
+            else:
+                # 删除本地文件
+                if os.path.exists(video.file_path):
+                    os.remove(video.file_path)
 
             # 删除临时文件
             video_temp_dir = os.path.join(settings.TEMP_DIR, video_id)

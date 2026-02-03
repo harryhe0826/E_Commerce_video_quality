@@ -1,6 +1,9 @@
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8000/api'
+// 使用环境变量，开发环境默认使用 localhost
+const API_BASE_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : 'http://localhost:8000/api'
 
 export interface VideoUploadResponse {
   video_id: string
