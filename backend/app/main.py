@@ -15,19 +15,22 @@ app = FastAPI(
 )
 
 # 配置 CORS
-# 从环境变量获取允许的源，默认允许所有来源
-allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "*")
-if allowed_origins_str == "*":
-    allowed_origins = ["*"]
-    allow_credentials = False  # 使用通配符时不能启用credentials
-else:
-    allowed_origins = allowed_origins_str.split(",")
-    allow_credentials = True
+# 允许的源列表 - 包括本地开发和生产环境
+allowed_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://e-commerce-video-quality.vercel.app",
+]
+
+# 如果设置了ALLOWED_ORIGINS环境变量，追加到列表
+env_origins = os.getenv("ALLOWED_ORIGINS")
+if env_origins and env_origins != "*":
+    allowed_origins.extend(env_origins.split(","))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=allow_credentials,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
