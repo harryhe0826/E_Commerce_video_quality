@@ -15,12 +15,19 @@ app = FastAPI(
 )
 
 # 配置 CORS
-# 从环境变量获取允许的源，生产环境中允许所有来源
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") != "*" else ["*"]
+# 从环境变量获取允许的源，默认允许所有来源
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "*")
+if allowed_origins_str == "*":
+    allowed_origins = ["*"]
+    allow_credentials = False  # 使用通配符时不能启用credentials
+else:
+    allowed_origins = allowed_origins_str.split(",")
+    allow_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
