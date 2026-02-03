@@ -1,6 +1,6 @@
 # Nixpacks plan for Railway deployment
 [phases.setup]
-nixPkgs = ["python310", "ffmpeg", "gcc", "glib", "stdenv.cc.cc.lib", "libstdcxx5"]
+nixPkgs = ["python310", "ffmpeg", "gcc", "glib", "stdenv.cc.cc.lib"]
 nixLibs = ["zlib", "libGL", "stdenv.cc.cc.lib"]
 
 [phases.build]
