@@ -1,9 +1,8 @@
 # Nixpacks plan for Railway deployment
+# Nixpacks will auto-detect Python from requirements.txt in root
 [phases.setup]
-nixPkgs = ["python39", "python39Packages.pip", "ffmpeg", "gcc", "bash"]
-
-[phases.install]
-cmds = ["cd backend && python3 -m pip install -r requirements.txt"]
+nixPkgs = ["ffmpeg", "gcc", "glib", "stdenv.cc.cc.lib"]
+nixLibs = ["zlib", "libGL"]
 
 [phases.build]
 cmds = ["chmod +x start.sh"]
