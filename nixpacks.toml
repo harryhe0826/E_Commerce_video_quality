@@ -1,7 +1,29 @@
 # Nixpacks plan for Railway deployment
 [phases.setup]
-nixPkgs = ["python310", "ffmpeg", "gcc", "glib", "stdenv.cc.cc.lib"]
-nixLibs = ["zlib", "libGL", "stdenv.cc.cc.lib"]
+nixPkgs = [
+  "python310",
+  "ffmpeg",
+  "gcc",
+  "glib",
+  "stdenv.cc.cc.lib",
+  # OpenCV dependencies
+  "libGL",
+  "glib",
+  "libxcb",
+  "xorg.libX11",
+  "xorg.libXext",
+  # PaddlePaddle/PaddleOCR dependencies
+  "libgomp",
+  # General ML libraries
+  "cmake",
+  "pkg-config"
+]
+nixLibs = [
+  "zlib",
+  "libGL",
+  "stdenv.cc.cc.lib",
+  "glib"
+]
 
 [phases.build]
 cmds = ["chmod +x start.sh"]
