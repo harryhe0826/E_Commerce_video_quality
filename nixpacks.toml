@@ -1,7 +1,6 @@
 # Nixpacks plan for Railway deployment
-# Nixpacks will auto-detect Python from requirements.txt in root
 [phases.setup]
-nixPkgs = ["ffmpeg", "gcc", "glib", "stdenv.cc.cc.lib"]
+nixPkgs = ["python310", "ffmpeg", "gcc", "glib", "stdenv.cc.cc.lib"]
 nixLibs = ["zlib", "libGL"]
 
 [phases.build]
