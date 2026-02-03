@@ -1,0 +1,12 @@
+# Nixpacks plan for Railway deployment
+[phases.setup]
+nixPkgs = ["python39", "ffmpeg", "gcc"]
+
+[phases.install]
+cmds = ["cd backend && pip install -r requirements.txt"]
+
+[phases.build]
+cmds = ["cd backend && python -c 'print(\"Build complete\")'"]
+
+[start]
+cmd = "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
