@@ -6,7 +6,7 @@ python-multipart==0.0.6
 
 # 视频处理
 ffmpeg-python==0.2.0
-opencv-python==4.9.0.80
+opencv-python==4.6.0.66
 scenedetect[opencv]>=0.6.0
 
 # 音频处理 (ASR)
